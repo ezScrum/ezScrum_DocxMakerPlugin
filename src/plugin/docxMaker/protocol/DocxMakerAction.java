@@ -40,7 +40,6 @@ public class DocxMakerAction implements Action {
 			EzScrumWebServiceController service = new EzScrumWebServiceController(ezScrumURL);
 			File releasePlan = service.getReleaseDocx(userName, encodedPassword, projectId, releaseId);
 			response.setHeader("Content-Transfer-Encoding", "binary");
-			// response.setHeader("Content-Encoding", "binary");
 			response.setHeader("Content-Disposition", "attachment; filename=" + releasePlan.getName());
 			response.setContentLength((int) releasePlan.length());
 			response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");

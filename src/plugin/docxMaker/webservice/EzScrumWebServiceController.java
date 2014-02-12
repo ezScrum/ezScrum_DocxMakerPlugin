@@ -46,11 +46,10 @@ public class EzScrumWebServiceController {
 		Builder result = webResource.type(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON);
 		JSONObject resultJSONObject = result.get(JSONObject.class);
 		Gson gson = new Gson();
-		
 		ReleasePlanObject reDesc = gson.fromJson(resultJSONObject.getString("releasePlanDesc"), ReleasePlanObject.class);
 		List<SprintPlanObject> sprinDescList = gson.fromJson(resultJSONObject.getString("sprintDescList"), new TypeToken<List<SprintPlanObject>>() {}.getType());
 		HashMap<String,List<StoryObject>> stories = gson.fromJson(resultJSONObject.getString("stories"), new TypeToken<HashMap<String,List<StoryObject>>>() {}.getType());
-		LinkedHashMap<Long, List<TaskObject>> taskMap = gson.fromJson(resultJSONObject.getString("taskMap"),  new TypeToken<LinkedHashMap<Long, List<TaskObject>>>() {}.getType());
+		LinkedHashMap<String, List<TaskObject>> taskMap = gson.fromJson(resultJSONObject.getString("taskMap"),  new TypeToken<LinkedHashMap<String, List<TaskObject>>>() {}.getType());
 		HashMap<String, Float> tatolStoryPoints = gson.fromJson(resultJSONObject.getString("totalStoryPoints"), new TypeToken<HashMap<String, Float>>() {}.getType());
 		
 		return new DocxMaker().getReleasePlanDocx(reDesc, sprinDescList, stories, taskMap, tatolStoryPoints);
