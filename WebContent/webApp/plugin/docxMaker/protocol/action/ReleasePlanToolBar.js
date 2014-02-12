@@ -10,16 +10,12 @@ Plugin.docxMaker.releasePlanToolBar.downloadBtnHandler = function(btn) {
         action : 'plugin/DocxMaker/getReleasePlan?releaseID=' + releaseID
     });
     document.body.appendChild(form);
-
-    // add any other form fields you like here
     form.submit();
     document.body.removeChild(form); 
 
 };
 
-
 Plugin.docxMaker.releasePlanToolBar.downloadBtnPlugin = Ext.extend(Ext.util.Observable, {
-
 	init: function(cmp) {
 		this.hostCmp = cmp;
 		this.hostCmp.on('render', this.onRender, this, {delay: 200});
