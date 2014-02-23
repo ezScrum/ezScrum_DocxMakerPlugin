@@ -11,6 +11,9 @@ import ntut.csie.ui.protocol.UIConfig;
 public class PluginImp extends UIConfig {
 	@Override
 	public void setEzScrumUIList(List<EzScrumUI> ezScrumUIList) {
+		/**
+		 * add PluginUI to  ezScrumUIList for DoD Plug-in
+		 */
 		final PluginUI pluginUI = new PluginUI() {
 			public String getPluginID() {
 				return "DocxMakerPlugin";
@@ -18,6 +21,9 @@ public class PluginImp extends UIConfig {
 		};
 		ezScrumUIList.add(pluginUI);
 		
+		/**
+		 * add ReleasePlanUI to ezScrumUIList for ReleasePlan Pages view
+		 */
 		ReleasePlanUI releasePlanUI = new ReleasePlanUI() {
 			@Override
 			public List<String> getToolbarPluginIDList() {

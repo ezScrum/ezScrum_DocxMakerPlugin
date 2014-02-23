@@ -30,6 +30,16 @@ public class EzScrumWebServiceController {
 		mEzScrumURL = ezScrumURL;
 	}
 
+	/**
+	 * use web-service to get release info and return release plan file
+	 * 
+	 * @param account - the user account(not encoded)
+	 * @param encodedPassword - the user password(encoded)
+	 * @param projectId - the release of project
+	 * @param releaseId - the release docx you wnat
+	 * @return release docx file
+	 * @throws JSONException
+	 */
 	public File getReleaseDocx(String account, String encodedPassword, String projectId, String releaseId) throws JSONException {
 		String encodedUserName = new String(Base64.encode(account.getBytes()));
 		// 需要的帳密為暗碼
