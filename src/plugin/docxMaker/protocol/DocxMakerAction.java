@@ -29,7 +29,7 @@ public class DocxMakerAction implements Action {
 		HttpSession session = request.getSession();
 		ProjectInfoForm projectInfoForm = (ProjectInfoForm) session.getAttribute(IProjectSummaryEnum.PROJECT_INFO_FORM);
 		IUserSession userSession = (IUserSession) session.getAttribute("UserSession");
-		String userName = userSession.getAccount().getName();
+		String userName = userSession.getAccount().getAccount();
 		String encodedPassword = (String) session.getAttribute("passwordForPlugin");
 		String projectId = projectInfoForm.getName();
 		String releaseId = request.getParameter("releaseID");
