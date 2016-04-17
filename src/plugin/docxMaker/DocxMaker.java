@@ -5,8 +5,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 import javax.xml.bind.JAXBElement;
@@ -15,6 +13,9 @@ import javax.xml.bind.JAXBException;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.codehaus.jettison.json.JSONArray;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
 import org.docx4j.XmlUtils;
 import org.docx4j.jaxb.Context;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
@@ -46,12 +47,6 @@ import org.docx4j.wml.Tc;
 import org.docx4j.wml.TcPr;
 import org.docx4j.wml.Tr;
 
-import plugin.docxMaker.dataModel.ReleasePlanObject;
-import plugin.docxMaker.dataModel.SprintPlanObject;
-import plugin.docxMaker.dataModel.StoryObject;
-import plugin.docxMaker.dataModel.TagObject;
-import plugin.docxMaker.dataModel.TaskObject;
-
 public class DocxMaker {
 	private static Log log = LogFactory.getLog(DocxMaker.class);
 	private ObjectFactory mFactory;
@@ -64,29 +59,25 @@ public class DocxMaker {
 	/**
 	 * get release plan docx file
 	 * 
-	 * @param releases - release info object
-	 * @param sprints - release info objects
-	 * @param storyMap - use sprint id as key to get its story objects
-	 * @param taskMap - use story id as key to get its task objects
-	 * @param tatolStoryPoints - sprint stories count
-	 * @return
+	 * @param releaseJSON - a JSON contain all release data
 	 */
-	public File getReleasePlanDocx(ReleasePlanObject releases, List<SprintPlanObject> sprints, HashMap<String, List<StoryObject>> storyMap, LinkedHashMap<String, List<TaskObject>> taskMap,
-	        HashMap<String, Float> tatolStoryPoints) {
+	public File getReleasePlanDocx(JSONObject releaseJSON) throws JSONException {
 		try {
 			wordMLPackage = WordprocessingMLPackage.createPackage();	// Create the package
 			MainDocumentPart mainDoc = wordMLPackage.getMainDocumentPart();
 			mFactory = Context.getWmlObjectFactory();
 			alterStyleSheet();					// change the style of this docx
-			addReleaseInfo(mainDoc, releases);	// the title of docx
-			SprintPlanObject sprint;
-			for (int i = 0, sprintSize = sprints.size(); i < sprintSize; i++) {
-				sprint = sprints.get(i);
-				addSprintInfo(mainDoc, sprints.get(i), tatolStoryPoints);
-				addStoryInfo(mainDoc, storyMap.get(sprint.getId()), taskMap);
+			addReleaseInfo(mainDoc, releaseJSON);	// the title of docx
+			JSONArray sprintJSONArray = releaseJSON.getJSONArray("sprints");
+			for (int i = 0, sprintSize = sprintJSONArray.length(); i < sprintSize; i++) {
+				JSONObject sprintJSON = sprintJSONArray.getJSONObject(i);
+				int totalStoryPoints = sprintJSON.getInt("totalStoryPoint");
+				addSprintInfo(mainDoc, sprintJSON, totalStoryPoints);
+				JSONArray storyJSONArray = sprintJSON.getJSONArray("stories");
+				addStoryInfo(mainDoc, storyJSONArray);
 				if (i != sprintSize) addPageBreak(mainDoc);	// add new page
 			}
-			String filePath = releases.getName() + "_ReleasePlan.docx";
+			String filePath = releaseJSON.get("name") + "_ReleasePlan.docx";
 			wordMLPackage.save(new File(filePath));	// Save it
 			return new File(filePath);
 		} catch (Docx4JException e) {
@@ -101,47 +92,48 @@ public class DocxMaker {
 	 * add release info as title
 	 * 
 	 * @param mainDoc - the Doc content
-	 * @param releases - release info object
+	 * @param releaseJSON - a JSON contain all release data
+	 * @throws JSONException 
 	 */
-	private void addReleaseInfo(MainDocumentPart mainDoc, ReleasePlanObject releases) {
-		mainDoc.addStyledParagraphOfText("Title", "Release Plan #" + releases.getId() + "： " + releases.getName());
-		mainDoc.addStyledParagraphOfText("Subtitle", "Start Date： " + releases.getStartDate());
-		mainDoc.addStyledParagraphOfText("Subtitle", "End Date： " + releases.getEndDate());
-		mainDoc.addStyledParagraphOfText("Subtitle", "Description： " + releases.getDescription());
+	private void addReleaseInfo(MainDocumentPart mainDoc, JSONObject releaseJSON) throws JSONException {
+		mainDoc.addStyledParagraphOfText("Title", "Release Plan #" + releaseJSON.get("serial_id") + "： " + releaseJSON.get("name"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "Start Date： " + releaseJSON.get("start_date"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "End Date： " + releaseJSON.get("end_date"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "Description： " + releaseJSON.get("description"));
 	}
 
 	/**
 	 * add sprint info above its stories
 	 * 
 	 * @param mainDoc - the Doc content
-	 * @param sprint - sprint info object
-	 * @param tatolStoryPoints - sprint stories count
+	 * @param sprintJSON - a JSON contain all sprint data
+	 * @param tatolStoryPoints - sprint stories estimate
+	 * @throws JSONException 
 	 */
-	private void addSprintInfo(MainDocumentPart mainDoc, SprintPlanObject sprint, HashMap<String, Float> tatolStoryPoints) {
-		mainDoc.addStyledParagraphOfText("Heading1", "Sprint #" + sprint.getId() + "： " + sprint.getGoal());
-		mainDoc.addStyledParagraphOfText("Subtitle", "Start Date： " + sprint.getStartDate());
-		mainDoc.addStyledParagraphOfText("Subtitle", "End Date： " + sprint.getEndDate());
-		mainDoc.addStyledParagraphOfText("Subtitle", "Total Story Points： " + tatolStoryPoints.get(sprint.getId()));
+	private void addSprintInfo(MainDocumentPart mainDoc, JSONObject sprintJSON, int tatolStoryPoints) throws JSONException {
+		mainDoc.addStyledParagraphOfText("Heading1", "Sprint #" + sprintJSON.get("serial_id") + "： " + sprintJSON.get("goal"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "Start Date： " + sprintJSON.get("start_date"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "End Date： " + sprintJSON.get("end_date"));
+		mainDoc.addStyledParagraphOfText("Subtitle", "Total Story Points： " + tatolStoryPoints);
 	}
 
 	/**
 	 * add story info below its sprint
 	 * 
 	 * @param mainDoc - the Doc content
-	 * @param storyList - story objects
-	 * @param taskMap - task objects
+	 * @param storyJSONArray - a JSON array contain all stories in the same release
 	 * @throws JAXBException
+	 * @throws JSONException 
 	 */
-	private void addStoryInfo(MainDocumentPart mainDoc, List<StoryObject> storyList, LinkedHashMap<String, List<TaskObject>> taskMap) throws JAXBException {
+	private void addStoryInfo(MainDocumentPart mainDoc, JSONArray storyJSONArray) throws JAXBException, JSONException {
 		try {
 			String tblXML = IOUtils.toString(new FileReader("StoryCard.xml"));	// 使用預設的Story Card 格式
-			StoryObject story = null;
-			int storySize = storyList.size();
-			for (int i = 0; i < storySize; i++) {
-				story = storyList.get(i);
-				mainDoc.addObject(getStoryTable(mainDoc, story, tblXML));
+			for (int i = 0; i < storyJSONArray.length(); i++) {
+				JSONObject storyJSON = storyJSONArray.getJSONObject(i);
+				mainDoc.addObject(getStoryTable(mainDoc, storyJSON, tblXML));
 				mainDoc.addParagraphOfText("Task List: ");
-				mainDoc.addObject(addTaskInfo(mainDoc, taskMap.get(story.id)));
+				JSONArray taskJSONArray = storyJSON.getJSONArray("tasks");
+				mainDoc.addObject(addTaskInfo(mainDoc, taskJSONArray));
 				mainDoc.addParagraphOfText("");
 				mainDoc.addParagraphOfText(" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
 				mainDoc.addParagraphOfText("");
@@ -159,37 +151,40 @@ public class DocxMaker {
 	 * add data to story card as docx table
 	 * 
 	 * @param mainDoc - the Doc content
-	 * @param story - the story object for table
+	 * @param storyJSON - a JSON contain story data
 	 * @param tblXML - the table xml for story card
 	 * @return the story table
 	 * @throws JAXBException
 	 * @throws FileNotFoundException
 	 * @throws IOException
+	 * @throws JSONException 
 	 */
-	private Tbl getStoryTable(MainDocumentPart mainDoc, StoryObject story, String tblXML) throws JAXBException, FileNotFoundException, IOException {
+	private Tbl getStoryTable(MainDocumentPart mainDoc, JSONObject storyJSON, String tblXML) throws JAXBException, FileNotFoundException, IOException, JSONException {
 		Tbl table = (Tbl) XmlUtils.unmarshalString(tblXML);	// row 2, 4, 5, 7, 9  是 table 的空白格
 		Tr row = null;
 		row = (Tr) table.getContent().get(0);	// get ID
 		JAXBElement<?> element = (JAXBElement<?>) row.getContent().get(0);
 		Tc tc = (Tc) element.getValue();
-		tc.getContent().set(0, mainDoc.createParagraphOfText("Sprint Backlog Item #" + story.id));							// add ID
+		tc.getContent().set(0, mainDoc.createParagraphOfText("Sprint Backlog Item #" + storyJSON.get("serial_id")));							// add ID
 		row = (Tr) table.getContent().get(1);	// get Name
 		element = (JAXBElement<?>) row.getContent().get(0);
 		tc = (Tc) element.getValue();
-		tc.getContent().set(0, mainDoc.createParagraphOfText(story.name));													// add Name
-		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(1), mainDoc.createStyledParagraphOfText("Bold_Number", story.importance), true);	// add Importance
+		tc.getContent().set(0, mainDoc.createParagraphOfText(storyJSON.getString("name")));													// add Name
+		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(1), mainDoc.createStyledParagraphOfText("Bold_Number", String.valueOf(storyJSON.get("importance"))), true);	// add Importance
 		row = (Tr) table.getContent().get(3);	// get Notes
-		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(0), mainDoc.createParagraphOfText(story.notes));	// add Notes
-		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(1), mainDoc.createStyledParagraphOfText("Bold_Number", story.estimation), true);	// add Estimate
+		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(0), mainDoc.createParagraphOfText(storyJSON.getString("notes")));	// add Notes
+		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(1), mainDoc.createStyledParagraphOfText("Bold_Number", String.valueOf(storyJSON.get("estimate"))), true);	// add Estimate
 		row = (Tr) table.getContent().get(6);	// get Tags
 		String tags = "";
-		for (TagObject tag : story.tagList) {
+		JSONArray tagJSONArray = storyJSON.getJSONArray("tags");
+		for (int i = 0; i < tagJSONArray.length(); i++) {
 			if (!tags.isEmpty()) tags = tags + ", ";
-			tags = tags + tag.getTagName();
+			JSONObject tagJSON = tagJSONArray.getJSONObject(i);
+			tags = tags + tagJSON.getString("name");
 		}
 		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(0), mainDoc.createParagraphOfText(tags));			// add Tags
 		row = (Tr) table.getContent().get(8);	// get How to Demo
-		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(0), mainDoc.createParagraphOfText(story.howToDemo));// add How to Demo
+		setStoryDataToTableColumn((JAXBElement<?>) row.getContent().get(0), mainDoc.createParagraphOfText(storyJSON.getString("how_to_demo")));// add How to Demo
 		return table;
 	}
 
@@ -229,14 +224,17 @@ public class DocxMaker {
 	 * add task info below its story
 	 * 
 	 * @param mainDoc - the Doc content
-	 * @param taskList - task info objects
+	 * @param taskJSONArray - a JSON array contain all tasks in the same story
 	 * @return table
 	 * @throws JAXBException
+	 * @throws JSONException 
 	 */
-	private Tbl addTaskInfo(MainDocumentPart mainDoc, List<TaskObject> taskList) throws JAXBException {
-		if (taskList == null) return null;
+	private Tbl addTaskInfo(MainDocumentPart mainDoc, JSONArray taskJSONArray) throws JAXBException, JSONException {
+		if (taskJSONArray.length() == 0) {
+			return null;
+		}
 		int writableWidthTwips = wordMLPackage.getDocumentModel().getSections().get(0).getPageDimensions().getWritableWidthTwips();
-		int rows = taskList.size();
+		int rows = taskJSONArray.length();
 		int cols = title.length;
 		int cellWidthTwips = new Double(Math.floor((writableWidthTwips / cols))).intValue();
 		Tbl table = mFactory.createTbl();
@@ -252,7 +250,7 @@ public class DocxMaker {
 			gridCol.setW(BigInteger.valueOf(cellWidthTwips));
 			tblGrid.getGridCol().add(gridCol);
 		}
-		setTaskInfoToDocx(mainDoc, table, taskList, rows, cols, cellWidthTwips);
+		setTaskInfoToDocx(mainDoc, table, taskJSONArray, rows, cols, cellWidthTwips);
 		return table;
 	}
 
@@ -261,12 +259,13 @@ public class DocxMaker {
 	 * 
 	 * @param mainDoc - the Doc content
 	 * @param table - the table of Doc
-	 * @param taskList - task objects
+	 * @param taskJSONArray - a JSON array contain all tasks in the same story
 	 * @param rows - table rows
 	 * @param cols - table columns
 	 * @param cellWidthTwips - table cell width
+	 * @throws JSONException 
 	 */
-	private void setTaskInfoToDocx(MainDocumentPart mainDoc, Tbl table, List<TaskObject> taskList, int rows, int cols, int cellWidthTwips) {
+	private void setTaskInfoToDocx(MainDocumentPart mainDoc, Tbl table, JSONArray taskJSONArray, int rows, int cols, int cellWidthTwips) throws JSONException {
 		for (int row = -1; row < rows; row++) {
 			Tr tr = mFactory.createTr();
 			table.getContent().add(tr);
@@ -276,17 +275,31 @@ public class DocxMaker {
 				if (row == -1) {		// title row
 					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell_Center", title[col]));
 				} else if (col == 0) {	// task Id
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell_Center", taskList.get(row).id));
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell_Center", taskJSONArray.getJSONObject(row).getString("serial_id")));
 				} else if (col == 1) {	// task Name
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskList.get(row).name));
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskJSONArray.getJSONObject(row).getString("name")));
 				} else if (col == 2) {	// task Est.
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell_Center", taskList.get(row).estimation));
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell_Center", taskJSONArray.getJSONObject(row).getString("estimate")));
 				} else if (col == 3) {	// task Handler
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskList.get(row).handler));
+					JSONObject handlerJSON = taskJSONArray.getJSONObject(row).getJSONObject("handler");
+					String handlerUsername = "";
+					try {
+						handlerUsername = handlerJSON.getString("username");
+					} catch (JSONException e) {
+						e.printStackTrace();
+					}
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", handlerUsername));
 				} else if (col == 4) {	// task Partners
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskList.get(row).partners));
+					String partnerUsernames = "";
+					JSONArray partnerJSONArray = taskJSONArray.getJSONObject(row).getJSONArray("partners");
+					for (int i = 0; i < partnerJSONArray.length(); i++) {
+						if (!partnerUsernames.isEmpty()) partnerUsernames = partnerUsernames + ", ";
+						JSONObject partnerJSON = partnerJSONArray.getJSONObject(i);
+						partnerUsernames = partnerUsernames + partnerJSON.getString("username");
+					}
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", partnerUsernames));
 				} else if (col == 5) {	// task Notes
-					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskList.get(row).notes));
+					tc.getContent().add(mainDoc.createStyledParagraphOfText("Table_Cell", taskJSONArray.getJSONObject(row).getString("notes")));
 				}
 				setTextVerticalCenter(tcPr);
 				setTableCellWidth(tcPr, cellWidthTwips);
